@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Home Page</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <nav class="navbar fixed-top navbar-expand-lg">
+    <div class="container-fluid">
+      <span class="navbar-brand">Σύστημα Διαχείρισης Ασφαλιστηρίων Συμβολαίων</span>
+      <button id="logoutBtn" class="btn btn-outline-light btn-sm">Log out</button>
+    </div>
+  </nav>
+
+  <div class="home-wrapper">
+    <div class="container-fluid pt-5">
+      <p id="userNamePlaceholder" class="fw-semibold fs-5 text-secondary mb-4 ms-2"></p>
+
+      <div class="d-flex justify-content-end mb-3 gap-2">
+        <button id="quickReviewBtn" class="btn btn-primary btn-sm">Quick Review</button>
+        <button id="reportBtn" class="btn btn-warning btn-sm">Reports</button>
+      </div>
+
+      <div class="row g-4 mb-4">
+        <div class="col-md-6">
+          <div class="card shadow h-100">
+            <div class="card-body">
+              <h5 class="card-title">Στατιστικά Ασφαλιστηρίων Συμβολαίων</h5>
+              <div class="d-flex justify-content-around">
+                <div><strong id="countChecked" class="text-success">0</strong><br>Έχουν ελεγχθεί</div>
+                <div><strong id="countUnverified" class="text-secondary">0</strong><br>Προς έλεγχο</div>
+                <div><strong id="countRejected" class="text-danger">0</strong><br>Δεν πληρούνται προϋποθέσεις</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-md-6">
+          <div class="card shadow h-100">
+            <div class="card-body">
+              <h5 class="card-title">Λήγουν Αυτή την Εβδομάδα</h5>
+              <ul id="expiringList" class="mb-0"></ul>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card shadow mb-4">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="card-title mb-0">Ημερολόγιο Λήξεων</h5>
+            <div>
+              <button class="btn btn-outline-secondary btn-sm me-2" id="prevMonth">←</button>
+              <span id="monthLabel" class="fw-bold"></span>
+              <button class="btn btn-outline-secondary btn-sm ms-2" id="nextMonth">→</button>
+            </div>
+          </div>
+          <div id="calendar"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const savedUsername = localStorage.getItem('savedUsername') || 'Χρήστης';
+    const savedRole = localStorage.getItem('savedRole') || '';
+    document.getElementById('userNamePlaceholder').textContent = `Καλησπέρα, ${savedUsername}!`;
+
+    document.getElementById('logoutBtn').addEventListener('click', () => {
+      localStorage.removeItem('savedUsername');
+      localStorage.removeItem('savedRole');
+      window.location.href = "login.html";
+    });
+
+    document.getElementById('quickReviewBtn').addEventListener('click', () => {
+      window.location.href = "quick-review.html";
+    });
+
+    const allowedReportRoles = ['Corporate Loan Administration', 'Risk Management', 'Relationship Management', 'Διοίκηση Τράπεζας'];
+    const reportBtn = document.getElementById('reportBtn');
+
+    if (!allowedReportRoles.includes(savedRole)) {
+      reportBtn.style.display = 'none';
+    } else {
+      reportBtn.addEventListener('click', () => {
+        window.location.href = 'notifications.html';
+      });
+    }
+
+    const allInsurances = JSON.parse(localStorage.getItem('newInsurances') || '[]');
+    let countChecked = 0, countUnverified = 0, countRejected = 0;
+    const now = new Date();
+    const oneWeekFromNow = new Date();
+    oneWeekFromNow.setDate(now.getDate() + 7);
+
+    const expiringList = document.getElementById('expiringList');
+    const expiryMap = new Map();
+
+    allInsurances.forEach(item => {
+      if (item.status === 'checked') countChecked++;
+      if (item.status === 'unverified') countUnverified++;
+      if (item.status === 'rejected') countRejected++;
+
+      const expiryDate = new Date(item.expiry);
+      const expiryKey = expiryDate.toDateString();
+      if (!expiryMap.has(expiryKey)) expiryMap.set(expiryKey, []);
+      expiryMap.get(expiryKey).push(item.clientName);
+
+      if (expiryDate >= now && expiryDate <= oneWeekFromNow) {
+        const li = document.createElement('li');
+        li.textContent = `${item.clientName} - λήγει στις ${item.expiry}`;
+        expiringList.appendChild(li);
+      }
+    });
+
+    document.getElementById('countChecked').textContent = countChecked;
+    document.getElementById('countUnverified').textContent = countUnverified;
+    document.getElementById('countRejected').textContent = countRejected;
+
+    const calendar = document.getElementById('calendar');
+    const monthLabel = document.getElementById('monthLabel');
+    let displayedDate = new Date();
+
+    function renderCalendar(year, month) {
+      calendar.innerHTML = '';
+      const daysInMonth = new Date(year, month + 1, 0).getDate();
+      const startDay = new Date(year, month, 1).getDay();
+
+      monthLabel.textContent = `${displayedDate.toLocaleString('default', { month: 'long' })} ${year}`;
+
+      for (let i = 0; i < startDay; i++) {
+        const empty = document.createElement('div');
+        empty.className = 'calendar-day';
+        calendar.appendChild(empty);
+      }
+
+      for (let day = 1; day <= daysInMonth; day++) {
+        const cell = document.createElement('div');
+        cell.className = 'calendar-day';
+        const dateObj = new Date(year, month, day);
+        const dateStr = dateObj.toDateString();
+        cell.innerHTML = `<span>${day}</span>`;
+
+        if (expiryMap.has(dateStr)) {
+          cell.classList.add('has-expiry');
+          const clients = expiryMap.get(dateStr);
+          clients.forEach(client => {
+            const clientSpan = document.createElement('span');
+            clientSpan.className = 'calendar-client';
+            clientSpan.textContent = client;
+            cell.appendChild(clientSpan);
+          });
+        }
+
+        calendar.appendChild(cell);
+      }
+    }
+
+    renderCalendar(displayedDate.getFullYear(), displayedDate.getMonth());
+
+    document.getElementById('prevMonth').addEventListener('click', () => {
+      displayedDate.setMonth(displayedDate.getMonth() - 1);
+      renderCalendar(displayedDate.getFullYear(), displayedDate.getMonth());
+    });
+
+    document.getElementById('nextMonth').addEventListener('click', () => {
+      displayedDate.setMonth(displayedDate.getMonth() + 1);
+      renderCalendar(displayedDate.getFullYear(), displayedDate.getMonth());
+    });
+  </script>
+</body>
+</html>

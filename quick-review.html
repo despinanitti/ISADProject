@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Quick Review</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <nav class="navbar fixed-top navbar-expand-lg">
+    <div class="container-fluid d-flex justify-content-between align-items-center">
+      <span class="navbar-brand">Σύστημα Διαχείρισης Ασφαλιστηρίων Συμβολαίων</span>
+      <a href="home.html" class="btn btn-outline-light btn-sm">Home</a>
+    </div>
+  </nav>
+
+  <div class="container-fluid" style="padding-top: 80px;">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h4>Λίστα Ασφαλιστηρίων Συμβολαίων</h4>
+      <div class="d-flex gap-2">
+        <button id="defineStructureBtn" class="btn btn-success btn-sm">Καθορισμός Δομής Ασφαλιστηρίου Συμβολαίου</button>
+        <button id="insertBtn" class="btn btn-success btn-sm">Εισαγωγή Ασφαλιστηρίου Συμβολαίου</button>
+      </div>
+    </div>
+
+    <div class="table-responsive">
+      <table class="table table-bordered text-center align-middle">
+        <thead class="table-dark">
+          <tr>
+            <th>ID ΠΕΛΑΤΗ</th>
+            <th>ΕΠΩΝΥΜΙΑ ΠΕΛΑΤΗ</th>
+            <th>ID ΑΚΙΝΗΤΟΥ</th>
+            <th>ID ΣΥΜΒΑΣΗΣ</th>
+            <th>ΕΛΕΓΧΟΣ ΠΥΡΟΣ</th>
+            <th>ΕΛΕΓΧΟΣ ΠΛΗΜΜΥΡΑΣ</th>
+            <th>ΕΛΕΓΧΟΣ ΣΕΙΣΜΟΥ</th>
+            <th>ΤΟΠΟΘΕΣΙΑ ΚΙΝΔΥΝΟΥ</th>
+            <th>ΠΟΣΟ ΑΣΦΑΛΙΖΟΜΕΝΟΥ ΚΙΝΔΥΝΟΥ</th>
+            <th>ΗΜΕΡΟΜΗΝΙΑ ΛΗΞΗΣ</th>
+            <th>ΕΛΛΕΙΨΕΙΣ / ΣΧΟΛΙΑ</th>
+            <th>ΗΜΕΡΟΜΗΝΙΑ ΤΕΛΕΥΤΑΙΑΣ ΕΝΗΜΕΡΩΣΗΣ</th>
+            <th>ΚΑΤΑΣΤΑΣΗ</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="insuranceTableBody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      const userDepartment = localStorage.getItem('savedRole') || '';
+      const defineStructureBtn = document.getElementById('defineStructureBtn');
+      const insertBtn = document.getElementById('insertBtn');
+
+      if (userDepartment === 'Corporate Loan Administration') {
+        defineStructureBtn.addEventListener('click', () => {
+          window.location.href = 'define-structure.html';
+        });
+      } else {
+        defineStructureBtn.classList.remove('btn-success');
+        defineStructureBtn.classList.add('btn-secondary');
+        defineStructureBtn.addEventListener('click', () => {
+          alert('Διαθέσιμο μόνο για Corporate Loan Administration');
+        });
+      }
+
+      if (userDepartment !== 'Service Management') {
+        insertBtn.classList.remove('btn-success');
+        insertBtn.classList.add('btn-secondary');
+        insertBtn.addEventListener('click', () => {
+          alert('Διαθέσιμο μόνο για Service Management.');
+        });
+      } else {
+        insertBtn.addEventListener('click', () => {
+          window.location.href = 'insert-insurance.html';
+        });
+      }
+
+      const insuranceData = JSON.parse(localStorage.getItem('newInsurances') || '[]');
+      const tbody = document.getElementById('insuranceTableBody');
+
+      insuranceData.forEach((row, index) => {
+        const requiresReview = [row.fireCheck, row.floodCheck, row.earthquakeCheck].includes('ΔΕΝ ΠΛΗΡΕΙΤΑΙ');
+        if (requiresReview) row.status = 'rejected';
+
+        const tr = document.createElement('tr');
+        tr.classList.add(`status-${row.status}`);
+
+        const statusSelect = `
+          <select class="form-select form-select-sm status-select" data-index="${index}" ${requiresReview ? 'disabled' : ''}>
+            <option value="checked" ${row.status === 'checked' ? 'selected' : ''}>ΕΧΕΙ ΕΛΕΓΧΘΕΙ</option>
+            <option value="unverified" ${row.status === 'unverified' ? 'selected' : ''}>ΠΡΟΣ ΕΛΕΓΧΟ</option>
+            <option value="rejected" ${row.status === 'rejected' ? 'selected' : ''}>ΔΕΝ ΠΛΗΡΟΥΝΤΑΙ ΠΡΟΥΠΟΘΕΣΕΙΣ</option>
+          </select>`;
+
+        const statusCell = (userDepartment === 'Risk Management') ? statusSelect
+          : (row.status === 'checked' ? 'ΕΧΕΙ ΕΛΕΓΧΘΕΙ' : row.status === 'unverified' ? 'ΠΡΟΣ ΕΛΕΓΧΟ' : 'ΔΕΝ ΠΛΗΡΟΥΝΤΑΙ ΠΡΟΥΠΟΘΕΣΕΙΣ');
+
+        tr.innerHTML = `
+          <td>${row.clientId}</td>
+          <td>${row.clientName}</td>
+          <td>${row.assetId}</td>
+          <td>${row.contractId}</td>
+          <td>${row.fireCheck}</td>
+          <td>${row.floodCheck}</td>
+          <td>${row.earthquakeCheck}</td>
+          <td>${row.location}</td>
+          <td>${row.amount}</td>
+          <td>${row.expiry}</td>
+          <td contenteditable="true">${row.comments}</td>
+          <td class="last-updated">${row.lastUpdated}</td>
+          <td>${statusCell}</td>
+          <td><a href="edit-insurance.html?index=${index}" class="btn btn-outline-primary btn-sm">Επεξεργασία Ασφαλιστηρίου Συμβολαίου</a></td>
+        `;
+
+        tbody.appendChild(tr);
+      });
+
+      if (userDepartment === 'Risk Management') {
+        tbody.addEventListener('change', e => {
+          if (e.target.classList.contains('status-select')) {
+            const index = e.target.dataset.index;
+            const newStatus = e.target.value;
+            const insuranceData = JSON.parse(localStorage.getItem('newInsurances')) || [];
+            const row = insuranceData[index];
+            const invalid = [row.fireCheck, row.floodCheck, row.earthquakeCheck].includes('ΔΕΝ ΠΛΗΡΕΙΤΑΙ');
+            if (invalid && newStatus === 'checked') {
+              alert('Δεν επιτρέπεται να επιλεγεί "ΕΧΕΙ ΕΛΕΓΧΘΕΙ" όταν κάποιος από τους ελέγχους αποτυγχάνει.');
+              e.target.value = row.status;
+              return;
+            }
+            row.status = newStatus;
+            row.lastUpdated = new Date().toLocaleDateString();
+            localStorage.setItem('newInsurances', JSON.stringify(insuranceData));
+            location.reload();
+          }
+        });
+      }
+    });
+  </script>
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const highlightId = params.get('highlight');
+
+    if (highlightId) {
+      const rows = document.querySelectorAll('#insuranceTableBody tr');
+      rows.forEach(row => {
+        const cell = row.children[0];
+        if (cell.textContent.trim() === highlightId) {
+          row.classList.add('highlighted-row');
+          setTimeout(() => {
+            row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }, 300);
+        }
+      });
+    }
+  </script>
+</body>
+</html>
